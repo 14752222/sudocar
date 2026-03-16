@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- 背景层：可以放动态壁纸或地图截图（如果实现的话） -->
+    <ImageView
+        android:id="@+id/bgImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="0.3" />
+
+    <!-- 主内容区 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- 顶部：导航信息 (大字) -->
+        <TextView
+            android:id="@+id/tvNavInfo"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="导航：前方右转"
+            android:textColor="#FFFF00"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <!-- 中部：音乐信息 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.5"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/tvSongTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="歌曲标题"
+                android:textColor="#FFFFFF"
+                android:textSize="24sp"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+
+            <TextView
+                android:id="@+id/tvLyric"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="歌词内容..."
+                android:textColor="#CCCCCC"
+                android:textSize="18sp"
+                android:maxLines="2"
+                android:gravity="center"/>
+        </LinearLayout>
+
+        <!-- 底部：常用 App 网格 -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvAppList"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.5"
+            android:overScrollMode="never" />
+
+    </LinearLayout>
+</FrameLayout>
