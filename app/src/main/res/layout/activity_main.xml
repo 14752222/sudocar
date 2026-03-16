@@ -1,74 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/main"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#000000">
+    android:layout_height="match_parent">
 
-    <!-- 背景层：可以放动态壁纸或地图截图（如果实现的话） -->
-    <ImageView
-        android:id="@+id/bgImage"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:scaleType="centerCrop"
-        android:alpha="0.3" />
+    <!-- 左侧 Fragment 容器 (固定 10%) -->
+    <FrameLayout
+        android:id="@+id/container_left"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/container_bottom"
+        app:layout_constraintWidth_default="percent"
+        app:layout_constraintWidth_percent="0.1" />
 
-    <!-- 主内容区 -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:padding="20dp">
+    <!--
+      中间 Fragment 容器
+      初始状态：在 Left 和 Right 之间，宽度大 (0.68)
+      注意：必须设置 width_default="percent"
+    -->
+    <FrameLayout
+        android:id="@+id/container_middle"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintStart_toEndOf="@id/container_left"
+        app:layout_constraintEnd_toStartOf="@id/container_right"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/container_bottom"
+        app:layout_constraintWidth_default="percent"
+        app:layout_constraintWidth_percent="0.68" />
 
-        <!-- 顶部：导航信息 (大字) -->
-        <TextView
-            android:id="@+id/tvNavInfo"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="导航：前方右转"
-            android:textColor="#FFFF00"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
+    <!--
+      右侧 Fragment 容器
+      初始状态：在 Middle 和 Parent 之间，宽度小 (0.22)
+      注意：必须设置 width_default="percent"
+    -->
+    <FrameLayout
+        android:id="@+id/container_right"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintStart_toEndOf="@id/container_middle"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/container_bottom"
+        android:background="@color/black"
+        app:layout_constraintWidth_default="percent"
+        app:layout_constraintWidth_percent="0.22" />
 
-        <!-- 中部：音乐信息 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1.5"
-            android:orientation="vertical"
-            android:gravity="center">
+    <!-- 底部 Fragment 容器 -->
+    <FrameLayout
+        android:id="@+id/container_bottom"
+        android:layout_width="0dp"
+        android:layout_height="60dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-            <TextView
-                android:id="@+id/tvSongTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="歌曲标题"
-                android:textColor="#FFFFFF"
-                android:textSize="24sp"
-                android:maxLines="1"
-                android:ellipsize="end"/>
-
-            <TextView
-                android:id="@+id/tvLyric"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="歌词内容..."
-                android:textColor="#CCCCCC"
-                android:textSize="18sp"
-                android:maxLines="2"
-                android:gravity="center"/>
-        </LinearLayout>
-
-        <!-- 底部：常用 App 网格 -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvAppList"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1.5"
-            android:overScrollMode="never" />
-
-    </LinearLayout>
-</FrameLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

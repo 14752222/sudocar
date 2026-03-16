@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">SudoCar</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="middleText">中间</string>
+    <string name="rightText">右边</string>
 </resources>
