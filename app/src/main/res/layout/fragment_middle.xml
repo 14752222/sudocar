@@ -1,14 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     tools:context=".fragment.MiddleFragment">
 
-    <!-- TODO: Update blank fragment layout -->
+    <!-- 修改点：高度设为 0dp，并添加 weight=1 以占据剩余空间 -->
     <TextView
+        android:id="@+id/tv_middle"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:text="@string/middleText" />
 
-</FrameLayout>
+    <!-- 现在这个按钮可以正常显示了 -->
+    <Button
+        android:id="@+id/tryPlay"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Try Play" />
+
+    <!--    <Button-->
+    <!--        android:id="@+id/tryPause"-->
+    <!--        android:layout_width="wrap_content"-->
+    <!--        android:layout_height="wrap_content"-->
+    <!--        android:text="Try Pause" />-->
+
+</LinearLayout>

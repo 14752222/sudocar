@@ -1,25 +1,31 @@
 package com.sudocar.launcher.fragment
 
 import android.os.Bundle
+import android.util.Log
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import com.sudocar.launcher.R
 import com.sudocar.launcher.databinding.FragmentMiddleBinding
+import com.sudocar.launcher.utils.QQMusicLyricController
 
 class MiddleFragment : Fragment() {
-    private var _binding: FragmentMiddleBinding? = null
-    private val binding get() = _binding!!
+    private val binding: FragmentMiddleBinding by lazy {
+        FragmentMiddleBinding.inflate(layoutInflater)
+    }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        Log.e("TAG ==>", "onCreate: ", )
+        super.onCreate(savedInstanceState)
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        _binding = FragmentMiddleBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        _binding = null
     }
 }
