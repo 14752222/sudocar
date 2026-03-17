@@ -82,6 +82,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupSwapListener() {
         val bottomView = bottomFragment.view
+
+        Log.e("app", "setupSwapListener: ")
         if (bottomView != null) {
             val swapBtn = bottomView.findViewById<Button>(R.id.btn_swap)
             swapBtn?.setOnClickListener {
