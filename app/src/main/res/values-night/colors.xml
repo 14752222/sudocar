@@ -1,36 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
-
-    <!-- 通用 - 夜间模式（黑色背景） -->
-    <color name="bg_dark">#000000</color>
-    <color name="bg_card">#1A1A1A</color>
-    <color name="bg_darker">#000000</color>
+    <!-- 日间模式颜色 (Light Theme) -->
+    
+    <!-- 通用 -->
+    <color name="bg_dark">#FFFFFF</color>
+    <color name="bg_card">#F5F5F5</color>
+    <color name="bg_darker">#EEEEEE</color>
     <color name="accent">#E94560</color>
     <color name="accent_light">#FF6B6B</color>
-    <color name="text_primary">#FFFFFF</color>
-    <color name="text_secondary">#A0A0A0</color>
-    <color name="divider">#333333</color>
-    <color name="btn_bg">#1A1A1A</color>
-    <color name="btn_bg_dark">#0D0D0D</color>
+    <color name="text_primary">#000000</color>
+    <color name="text_secondary">#666666</color>
+    <color name="divider">#E0E0E0</color>
+    <color name="btn_bg">#E3F2FD</color>
+    <color name="btn_bg_dark">#BBDEFB</color>
     <color name="transparent">#00000000</color>
-    <color name="overlay">#CC000000</color>
+    <color name="overlay">#80000000</color>
 
     <!-- 地图按钮 -->
     <color name="map_amap">#1AAD19</color>
     <color name="map_baidu">#3385FF</color>
     <color name="map_tencent">#12B7F5</color>
 
-    <!-- 底部栏 - 夜间模式 -->
-    <color name="bottom_bg">#000000</color>
-    <color name="bottom_icon">#FFFFFF</color>
+    <!-- 底部栏 - 日间模式 -->
+    <color name="bottom_bg">#FFFFFF</color>
+    <color name="bottom_icon">#666666</color>
     <color name="bottom_icon_active">#E94560</color>
     <color name="ac_temp">#2196F3</color>
 
     <!-- 空调 -->
     <color name="ac_on">#4CAF50</color>
-    <color name="ac_off">#666666</color>
+    <color name="ac_off">#999999</color>
 
     <!-- 兼容旧代码的颜色别名 -->
     <color name="music_bg">@color/bg_dark</color>

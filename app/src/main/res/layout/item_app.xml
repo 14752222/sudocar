@@ -20,7 +20,7 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:textSize="14sp"
-        android:textColor="@android:color/black"
+        android:textColor="@color/text_primary"
         android:maxLines="1"
         android:layout_gravity="center_horizontal"
         android:textAlignment="center"

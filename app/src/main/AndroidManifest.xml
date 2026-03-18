@@ -4,14 +4,20 @@
 
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="PackageVisibilityPolicy,QueryAllPackagesPermission" />
+    <uses-permission android:name="android.permission.MEDIA_CONTENT_CONTROL" />
 
     <queries>
+        <!-- QQ 音乐车机版 -->
         <package android:name="com.tencent.qqmusiccar" />
-        <!-- 或者直接指定 service -->
         <intent>
             <action android:name="com.tencent.qqmusiccar.third.api.IQQMusicApi" />
-            <!-- 如果不知道 action，保留 package 即可 -->
         </intent>
+
+        <!-- 地图应用 -->
+        <package android:name="com.autonavi.amapauto" />   <!-- 高德车机版 -->
+        <package android:name="com.autonavi.minimap" />    <!-- 高德手机版 -->
+        <package android:name="com.baidu.BaiduMap" />      <!-- 百度地图 -->
+        <package android:name="com.tencent.map" />         <!-- 腾讯地图 -->
     </queries>
 
 
@@ -40,17 +46,6 @@
             </intent-filter>
         </activity>
 
-        <receiver android:name=".receiver.QQMusicBroadcastReceiver" android:exported="true"
-            android:permission="TODO">
-            <intent-filter>
-                <!-- 这里填入你抓到的真实 Action -->
-                <action android:name="com.tencent.qqmusiccar.action.META_CHANGED" />
-                <action android:name="com.tencent.qqmusiccar.action.PLAYSTATE_CHANGED" />
-                <!-- 也可以尝试通用的 Android 媒体广播 -->
-                <action android:name="com.android.music.playstatechanged" />
-                <action android:name="com.android.music.metachanged" />
-            </intent-filter>
-        </receiver>
     </application>
 
 

@@ -1,14 +1,143 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/music_bg"
+    android:paddingStart="10dp"
+    android:paddingEnd="10dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="6dp"
     tools:context=".fragment.RightFragment">
 
-    <!-- TODO: Update blank fragment layout -->
-    <TextView
+    <!-- 专辑封面 + 歌曲信息 -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:text="@string/rightText" />
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_music_card"
+        android:padding="10dp">
 
-</FrameLayout>
+        <!-- 专辑封面占位 -->
+        <FrameLayout
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_album_cover">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="♪"
+                android:textSize="22sp"
+                android:textColor="@color/music_accent" />
+        </FrameLayout>
+
+        <!-- 歌曲名 + 歌手 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="10dp">
+
+            <TextView
+                android:id="@+id/tv_song_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="未播放"
+                android:textColor="@color/music_text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:focusable="true"
+                android:focusableInTouchMode="true" />
+
+            <TextView
+                android:id="@+id/tv_artist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="--"
+                android:textColor="@color/music_text_secondary"
+                android:textSize="11sp"
+                android:layout_marginTop="2dp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- 歌词区域 -->
+    <ScrollView
+        android:id="@+id/sv_lyric"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_music_card"
+        android:scrollbars="none"
+        android:fadeScrollbars="true">
+
+        <TextView
+            android:id="@+id/tv_lyric"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:lineSpacingMultiplier="2.0"
+            android:textSize="12sp"
+            android:textColor="@color/music_text_secondary"
+            android:padding="12dp"
+            android:text="暂无歌词" />
+    </ScrollView>
+
+    <!-- 播放控制区 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_music_card"
+        android:padding="8dp">
+
+        <!-- 上一首 -->
+        <ImageButton
+            android:id="@+id/btn_prev"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_ctrl_btn"
+            android:src="@android:drawable/ic_media_previous"
+            android:contentDescription="上一首"
+            android:scaleType="centerInside"
+            android:padding="8dp" />
+
+        <!-- 播放/暂停 -->
+        <ImageButton
+            android:id="@+id/btn_play_pause"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_marginHorizontal="16dp"
+            android:background="@drawable/bg_play_btn"
+            android:src="@android:drawable/ic_media_play"
+            android:contentDescription="播放暂停"
+            android:scaleType="centerInside"
+            android:padding="10dp" />
+
+        <!-- 下一首 -->
+        <ImageButton
+            android:id="@+id/btn_next"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_ctrl_btn"
+            android:src="@android:drawable/ic_media_next"
+            android:contentDescription="下一首"
+            android:scaleType="centerInside"
+            android:padding="8dp" />
+
+    </LinearLayout>
+
+</LinearLayout>

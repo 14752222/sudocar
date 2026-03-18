@@ -1,30 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
+    android:background="@color/map_bg"
     tools:context=".fragment.MiddleFragment">
 
-    <!-- 修改点：高度设为 0dp，并添加 weight=1 以占据剩余空间 -->
-    <TextView
-        android:id="@+id/tv_middle"
+    <!-- 地图容器 -->
+    <FrameLayout
+        android:id="@+id/map_container"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:text="@string/middleText" />
+        android:layout_height="match_parent" />
 
-    <!-- 现在这个按钮可以正常显示了 -->
-    <Button
-        android:id="@+id/tryPlay"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Try Play" />
+    <!-- 地图未启动时的占位提示 -->
+    <LinearLayout
+        android:id="@+id/layout_map_placeholder"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="visible">
 
-    <!--    <Button-->
-    <!--        android:id="@+id/tryPause"-->
-    <!--        android:layout_width="wrap_content"-->
-    <!--        android:layout_height="wrap_content"-->
-    <!--        android:text="Try Pause" />-->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🗺"
+            android:textSize="48sp" />
 
-</LinearLayout>
+        <TextView
+            android:id="@+id/tv_map_hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="选择地图应用"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <!-- 左侧地图选择下拉 -->
+    <Spinner
+        android:id="@+id/spinner_map"
+        android:layout_width="100dp"
+        android:layout_height="40dp"
+        android:layout_gravity="top|start"
+        android:layout_margin="10dp"
+        android:background="@drawable/bg_spinner"
+        android:popupBackground="@color/bg_card" />
+
+    <!-- 右侧切换按钮 -->
+    <ImageButton
+        android:id="@+id/btn_swap_right"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="10dp"
+        android:background="@drawable/bg_map_switcher"
+        android:src="@android:drawable/ic_menu_sort_by_size"
+        android:contentDescription="切换大屏"
+        android:scaleType="centerInside"
+        android:padding="10dp" />
+
+</FrameLayout>
