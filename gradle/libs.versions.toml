@@ -12,6 +12,7 @@ material = "1.13.0"
 activity = "1.13.0"
 constraintlayout = "2.2.1"
 recyclerview = "1.4.0"
+kotlinx-coroutines = "1.8.0"
 
 [libraries]
 androidx-constraintlayout-v214 = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayoutVersion" }
@@ -26,6 +27,8 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -1,18 +1,24 @@
 package com.sudocar.launcher.fragment
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.IntentFilter
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.sudocar.launcher.databinding.FragmentRightBinding
 import com.sudocar.launcher.receiver.QQMusicBroadcastReceiver
+import com.sudocar.launcher.service.MediaNotificationListenerService
+import com.sudocar.launcher.utils.LyricController
+import com.sudocar.launcher.utils.MediaSessionController
 import com.sudocar.launcher.utils.QQMusicController
 import com.sudocar.launcher.utils.QQMusicLyricController
 
@@ -22,7 +28,13 @@ class RightFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val musicReceiver by lazy { QQMusicBroadcastReceiver() }
-    private val lyricController by lazy { QQMusicLyricController(requireContext()) }
+    private val qqLyricController by lazy { QQMusicLyricController(requireContext()) }
+    private val lyricController by lazy { LyricController() }  // 通用歌词控制器
+    private val mediaSessionController by lazy { MediaSessionController(requireContext()) }
+
+    // 当前歌曲信息，用于歌词请求
+    private var currentSongTitle = ""
+    private var currentArtist = ""
 
     private var isPlaying = false
 
@@ -31,7 +43,12 @@ class RightFragment : Fragment() {
         override fun run() {
             // 仅在播放时轮询歌词，减少 CPU 消耗
             if (isPlaying) {
-                lyricController.requestLyricManual()
+                // 优先尝试 QQ 音乐歌词，失败则使用网络歌词
+                if (mediaSessionController.getCurrentPackageName().contains("qqmusic")) {
+                    qqLyricController.requestLyricManual()
+                } else {
+                    lyricController.requestLyric(currentSongTitle, currentArtist)
+                }
             }
             lyricHandler.postDelayed(this, LYRIC_REFRESH_INTERVAL)
         }
@@ -54,19 +71,83 @@ class RightFragment : Fragment() {
     }
 
     private fun initControllers() {
-        // 歌词控制器 - 延迟初始化
-        lyricController.onLyricReceived = { lyric ->
+        // QQ 音乐歌词控制器（AIDL 方式，仅对 QQ 音乐有效）
+        qqLyricController.onLyricReceived = { lyric ->
             binding.tvLyric.text = lyric
         }
-        lyricController.bindService()
+        qqLyricController.bindService()
 
-        // 广播接收器
-        musicReceiver.onMusicInfoChanged = { info ->
+        // 通用歌词控制器（网络 API，对所有音乐 APP 有效）
+        lyricController.onLyricReceived = { lyric ->
+            if (lyric.isNotEmpty()) {
+                binding.tvLyric.text = lyric
+            }
+        }
+        lyricController.onError = { error ->
+            Log.d(TAG, "歌词获取失败: $error")
+        }
+
+        // ---- MediaSession 控制器 (优先) ----
+        val listenerComponent = ComponentName(
+            requireContext(),
+            MediaNotificationListenerService::class.java
+        )
+
+        // 检查通知访问权限
+        val enabledListeners = Settings.Secure.getString(
+            requireContext().contentResolver,
+            "enabled_notification_listeners"
+        )
+        val hasPermission = enabledListeners?.contains(requireContext().packageName) == true
+
+        if (!hasPermission) {
+            Log.w(TAG, "未开启通知访问权限，MediaSession 将不可用")
+            // 可选：提示用户开启权限
+            // Toast.makeText(context, "建议开启通知访问以获取媒体信息", Toast.LENGTH_LONG).show()
+        }
+
+        mediaSessionController.onMediaInfoChanged = { info ->
             binding.tvSongTitle.text = info.title
             binding.tvArtist.text = info.artist
             isPlaying = info.isPlaying
             updatePlayPauseIcon()
-            Log.d(TAG, "歌曲: ${info.title} - ${info.artist}, playing=$isPlaying")
+
+            // 更新当前歌曲信息，用于歌词请求
+            val songChanged = currentSongTitle != info.title || currentArtist != info.artist
+            currentSongTitle = info.title
+            currentArtist = info.artist
+
+            // 歌曲变化时请求歌词
+            if (songChanged && info.title != "未知歌曲") {
+                Log.d(TAG, "歌曲变化，请求歌词: ${info.title} - ${info.artist}")
+                // 立即请求歌词
+                if (!info.packageName.contains("qqmusic")) {
+                    lyricController.requestLyric(info.title, info.artist)
+                }
+            }
+            
+            // 显示播放来源（调试用）
+            Log.d(TAG, "MediaSession 歌曲: ${info.title} - ${info.artist}, source=${info.packageName}, playing=$isPlaying")
+        }
+
+        // 注册 MediaSession 监听
+        try {
+            mediaSessionController.register(listenerComponent)
+            Log.d(TAG, "MediaSession 注册成功")
+        } catch (e: SecurityException) {
+            Log.e(TAG, "MediaSession 注册失败 (权限未授权): ${e.message}")
+        }
+
+        // ---- 广播接收器 (备用) ----
+        musicReceiver.onMusicInfoChanged = { info ->
+            // 仅当 MediaSession 没有数据时使用广播
+            if (binding.tvSongTitle.text == "未播放") {
+                binding.tvSongTitle.text = info.title
+                binding.tvArtist.text = info.artist
+                isPlaying = info.isPlaying
+                updatePlayPauseIcon()
+                Log.d(TAG, "Broadcast 歌曲: ${info.title} - ${info.artist}, playing=$isPlaying")
+            }
         }
 
         val filter = IntentFilter().apply {
@@ -106,19 +187,38 @@ class RightFragment : Fragment() {
         
         binding.btnPrev.setOnClickListener { 
             Log.d(TAG, "点击: 上一首")
-            QQMusicController.prev(ctx)
+            // 优先使用 MediaSession 控制，备用广播
+            if (!tryMediaSession { it.previous() }) {
+                QQMusicController.prev(ctx)
+            }
         }
         
         binding.btnPlayPause.setOnClickListener { 
             Log.d(TAG, "点击: 播放/暂停")
-            QQMusicController.playPause(ctx)
-            isPlaying = !isPlaying
-            updatePlayPauseIcon()
+            // 优先使用 MediaSession 控制，备用广播
+            if (!tryMediaSession { it.playPause() }) {
+                QQMusicController.playPause(ctx)
+                isPlaying = !isPlaying
+                updatePlayPauseIcon()
+            }
         }
         
         binding.btnNext.setOnClickListener { 
             Log.d(TAG, "点击: 下一首")
-            QQMusicController.next(ctx)
+            // 优先使用 MediaSession 控制，备用广播
+            if (!tryMediaSession { it.next() }) {
+                QQMusicController.next(ctx)
+            }
+        }
+    }
+
+    /** 尝试使用 MediaSessionController 执行操作，返回是否成功 */
+    private fun tryMediaSession(action: (MediaSessionController) -> Boolean): Boolean {
+        return try {
+            action(mediaSessionController)
+        } catch (e: Exception) {
+            Log.w(TAG, "MediaSession 控制失败: ${e.message}")
+            false
         }
     }
 
@@ -150,19 +250,25 @@ class RightFragment : Fragment() {
         val ctx = requireContext()
         return when (keyCode) {
             KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
-                QQMusicController.prev(ctx)
+                if (!tryMediaSession { it.previous() }) {
+                    QQMusicController.prev(ctx)
+                }
                 Log.d(TAG, "方向盘: 上一首")
                 true
             }
             KeyEvent.KEYCODE_MEDIA_NEXT -> {
-                QQMusicController.next(ctx)
+                if (!tryMediaSession { it.next() }) {
+                    QQMusicController.next(ctx)
+                }
                 Log.d(TAG, "方向盘: 下一首")
                 true
             }
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                QQMusicController.playPause(ctx)
-                isPlaying = !isPlaying
-                updatePlayPauseIcon()
+                if (!tryMediaSession { it.playPause() }) {
+                    QQMusicController.playPause(ctx)
+                    isPlaying = !isPlaying
+                    updatePlayPauseIcon()
+                }
                 Log.d(TAG, "方向盘: 播放/暂停")
                 true
             }
@@ -181,6 +287,12 @@ class RightFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         lyricHandler.removeCallbacksAndMessages(null)
+        // 注销 MediaSession
+        mediaSessionController.unregister()
+        // 注销歌词控制器
+        qqLyricController.unbindService()
+        lyricController.destroy()
+        // 注销广播接收器
         try { 
             requireContext().unregisterReceiver(musicReceiver) 
         } catch (_: Exception) {}
