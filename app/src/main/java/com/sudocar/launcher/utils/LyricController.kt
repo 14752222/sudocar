@@ -201,7 +201,12 @@ class LyricController {
     }
 
     fun unbindService() {
-        TODO("Not yet implemented")
+        // 移除歌词服务绑定（当前为stub实现）
+        try {
+            coroutineScope.cancel()
+        } catch (e: Exception) {
+            Log.w(TAG, "unbindService: ${e.message}")
+        }
     }
 
     companion object {

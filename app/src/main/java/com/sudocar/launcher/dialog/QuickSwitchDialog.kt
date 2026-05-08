@@ -7,6 +7,7 @@ import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.ImageView
@@ -14,10 +15,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.sudocar.launcher.R
 
-/**
- * 快捷应用切换弹窗
- * 方向盘左右键切换，上下文确认启动
- */
 class QuickSwitchDialog(context: Context) : Dialog(context, android.R.style.Theme_Translucent_NoTitleBar) {
 
     private var quickApps: List<SettingsDialog.QuickAppInfo> = emptyList()
@@ -26,6 +23,7 @@ class QuickSwitchDialog(context: Context) : Dialog(context, android.R.style.Them
 
     private val handler = Handler(Looper.getMainLooper())
     private var dismissRunnable: Runnable? = null
+    private var isViewInitialized = false
 
     fun setOnLaunchListener(listener: (String) -> Unit) {
         onLaunchListener = listener
@@ -43,13 +41,13 @@ class QuickSwitchDialog(context: Context) : Dialog(context, android.R.style.Them
         }
 
         setCanceledOnTouchOutside(false)
+        isViewInitialized = true
         loadApps()
     }
 
     private fun loadApps() {
         quickApps = SettingsDialog.getAllQuickApps(context)
         if (quickApps.isEmpty()) {
-            // 默认加上桌面
             quickApps = listOf(SettingsDialog.QuickAppInfo(context.packageName, "桌面"))
         }
         currentIndex = 0
@@ -57,8 +55,8 @@ class QuickSwitchDialog(context: Context) : Dialog(context, android.R.style.Them
     }
 
     override fun show() {
-        loadApps() // 每次显示都重新加载
-        applyTheme() // 应用主题背景
+        loadApps()
+        applyTheme()
         super.show()
         scheduleDismiss()
     }
@@ -69,14 +67,15 @@ class QuickSwitchDialog(context: Context) : Dialog(context, android.R.style.Them
             if (isNightMode) android.R.color.transparent else android.R.color.background_light
         )
         
-        // 找到提示文字并设置颜色
         findViewById<TextView>(R.id.tv_hint)?.setTextColor(
             context.getColor(if (isNightMode) R.color.text_secondary else R.color.text_primary)
         )
     }
 
     private fun updateDisplay() {
-        val layoutApps = findViewById<LinearLayout>(R.id.layout_apps) ?: return
+        if (!isViewInitialized) return
+        
+        val layoutApps = findViewById<LinearLayout>(R.id.root) ?: return
         layoutApps.removeAllViews()
 
         if (quickApps.isEmpty()) return
@@ -85,7 +84,6 @@ class QuickSwitchDialog(context: Context) : Dialog(context, android.R.style.Them
         val appView = createAppView(app.packageName, app.name)
         layoutApps.addView(appView)
 
-        // 高亮当前应用
         appView.alpha = 1.0f
         appView.scaleX = 1.2f
         appView.scaleY = 1.2f
@@ -124,7 +122,6 @@ class QuickSwitchDialog(context: Context) : Dialog(context, android.R.style.Them
         container.addView(iconView)
         container.addView(nameView)
 
-        // 当前选中项加边框
         if (packageName == quickApps.getOrNull(currentIndex)?.packageName) {
             container.setBackgroundResource(R.drawable.bg_popup_item)
         }
@@ -136,7 +133,6 @@ class QuickSwitchDialog(context: Context) : Dialog(context, android.R.style.Them
         return try {
             val pm = context.packageManager
             if (packageName == context.packageName) {
-                // 桌面用默认图标
                 pm.getApplicationIcon(pm.getApplicationInfo(packageName, 0))
             } else {
                 pm.getApplicationIcon(packageName)
@@ -146,7 +142,6 @@ class QuickSwitchDialog(context: Context) : Dialog(context, android.R.style.Them
         }
     }
 
-    /** 向左切换 */
     fun switchLeft(): Boolean {
         if (quickApps.isEmpty()) return false
         currentIndex = if (currentIndex > 0) currentIndex - 1 else quickApps.size - 1
@@ -155,7 +150,6 @@ class QuickSwitchDialog(context: Context) : Dialog(context, android.R.style.Them
         return true
     }
 
-    /** 向右切换 */
     fun switchRight(): Boolean {
         if (quickApps.isEmpty()) return false
         currentIndex = (currentIndex + 1) % quickApps.size
@@ -164,7 +158,6 @@ class QuickSwitchDialog(context: Context) : Dialog(context, android.R.style.Them
         return true
     }
 
-    /** 确认启动当前应用 */
     fun confirmLaunch(): Boolean {
         if (!isShowing || quickApps.isEmpty()) return false
 
@@ -174,15 +167,12 @@ class QuickSwitchDialog(context: Context) : Dialog(context, android.R.style.Them
         return true
     }
 
-    /** 获取当前应用包名 */
     fun getCurrentPackage(): String? {
         return quickApps.getOrNull(currentIndex)?.packageName
     }
 
-    /** 获取当前索引 */
     fun getCurrentIndex(): Int = currentIndex
 
-    /** 设置当前索引 */
     fun setCurrentIndex(index: Int) {
         if (index in quickApps.indices) {
             currentIndex = index
@@ -197,7 +187,7 @@ class QuickSwitchDialog(context: Context) : Dialog(context, android.R.style.Them
                 dismiss()
             }
         }
-        handler.postDelayed(dismissRunnable!!, 3000) // 3秒无操作自动消失
+        handler.postDelayed(dismissRunnable!!, 3000)
     }
 
     override fun dismiss() {

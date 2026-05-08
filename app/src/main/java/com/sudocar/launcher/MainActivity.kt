@@ -1,5 +1,6 @@
 package com.sudocar.launcher
 
+import android.content.ContentValues.TAG
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -7,6 +8,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Button
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -26,9 +28,10 @@ class MainActivity : AppCompatActivity(),
     BottomFragment.OnSwapClickListener, 
     BottomFragment.OnNightModeChangeListener,
     MiddleFragment.OnSwapClickListener,
-    SettingsDialog.OnNightModeChangeListener,
+    SettingsDialog.OnDebugModeChangeListener,
     SettingsDialog.OnBackgroundChangeListener,
-    SettingsDialog.OnTestQuickSwitchListener {
+    SettingsDialog.OnTestQuickSwitchListener,
+    SettingsDialog.OnKeyTestToggleListener {
 
     private val leftFragment = LeftFragment()
     private val middleFragment = MiddleFragment()
@@ -40,6 +43,10 @@ class MainActivity : AppCompatActivity(),
 
     private lateinit var keyEventManager: KeyEventManager
     private var quickSwitchDialog: QuickSwitchDialog? = null
+
+    // 长按计数，用于区分短按和长按
+    private var lastLongPressTime = 0L
+    private val LONG_PRESS_THRESHOLD = 800L  // 800ms 视为长按
 
     val binding: ActivityMainBinding by lazy {
         ActivityMainBinding.inflate(layoutInflater)
@@ -65,11 +72,25 @@ class MainActivity : AppCompatActivity(),
         enableEdgeToEdge()
         setContentView(binding.root)
 
+        // ✅ 添加 OnBackPressedDispatcher 处理返回键
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (quickSwitchDialog?.isShowing == true) {
+                    quickSwitchDialog?.dismiss()
+                }
+            }
+        })
+
         initWindowManager()
 
-        keyEventManager = KeyEventManager(object : KeyEventManager.KeyCallback {
+        keyEventManager = KeyEventManager(this, object : KeyEventManager.KeyCallback {
             override fun onMediaKey(keyCode: Int): Boolean {
                 return handleMediaKey(keyCode)
+            }
+            
+            override fun onAnyKey(keyCode: Int, action: Int, event: android.view.KeyEvent): Boolean {
+                // 这里可以处理特殊按键，比如长按切换测试模式
+                return false
             }
         })
         keyEventManager.start(this)
@@ -112,45 +133,86 @@ class MainActivity : AppCompatActivity(),
 
     /** 应用背景色和字体颜色 */
     fun applyBackground() {
-        val isNightMode = SettingsDialog.isNightModeEnabled(this)
-        val customColor = SettingsDialog.getWallpaperColor(this)
+        try {
+            Log.d(TAG, "applyBackground 开始")
+            
+            val isNightMode = SettingsDialog.isNightModeEnabled(this)
+            val customColor = SettingsDialog.getWallpaperColor(this)
 
-        Log.d(TAG, "applyBackground: nightMode=$isNightMode, color=$customColor")
+            Log.d(TAG, "applyBackground: nightMode=$isNightMode, color=$customColor")
 
-        // 从颜色资源获取
-        val bgColor = if (isNightMode) {
-            if (customColor != null) {
-                try {
-                    Color.parseColor(customColor)
-                } catch (e: Exception) {
+            // 从颜色资源获取
+            val bgColor = if (isNightMode) {
+                if (customColor != null) {
+                    try {
+                        Color.parseColor(customColor)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error parsing custom color: ${e.message}")
+                        getColor(R.color.bg_dark)
+                    }
+                } else {
                     getColor(R.color.bg_dark)
                 }
             } else {
-                getColor(R.color.bg_dark)
+                getColor(R.color.bg_dark)  // 日间模式白色
             }
-        } else {
-            getColor(R.color.bg_dark)  // 日间模式白色
+            
+            val textColor = getColor(R.color.text_primary)
+            val bottomBgColor = getColor(R.color.bottom_bg)
+
+            // 设置主背景
+            try {
+                binding.main.setBackgroundColor(bgColor)
+                Log.d(TAG, "主背景已设置")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting main background: ${e.message}")
+            }
+            
+            // 设置所有 Fragment 容器的背景
+            try {
+                findViewById<View>(R.id.container_left)?.setBackgroundColor(bgColor)
+                Log.d(TAG, "左容器背景已设置")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting left container: ${e.message}")
+            }
+            
+            try {
+                findViewById<View>(R.id.container_middle)?.setBackgroundColor(bgColor)
+                Log.d(TAG, "中容器背景已设置")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting middle container: ${e.message}")
+            }
+            
+            try {
+                findViewById<View>(R.id.container_right)?.setBackgroundColor(bgColor)
+                Log.d(TAG, "右容器背景已设置")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting right container: ${e.message}")
+            }
+            
+            try {
+                findViewById<View>(R.id.container_bottom)?.setBackgroundColor(bottomBgColor)
+                Log.d(TAG, "底部容器背景已设置")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting bottom container: ${e.message}")
+            }
+
+            // 保存当前颜色模式到全局，供 Fragment 读取
+            try {
+                getSharedPreferences(SettingsDialog.PREFS_NAME, MODE_PRIVATE).edit()
+                    .putBoolean(SettingsDialog.KEY_NIGHT_MODE, isNightMode)
+                    .putInt("textColor", textColor)
+                    .apply()
+                Log.d(TAG, "SharedPreferences 已保存")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving SharedPreferences: ${e.message}")
+            }
+
+            Log.d(TAG, "背景已设置: bg=${Integer.toHexString(bgColor)}, text=${Integer.toHexString(textColor)}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in applyBackground: ${e.message}")
+            e.printStackTrace()
         }
-        
-        val textColor = getColor(R.color.text_primary)
-        val bottomBgColor = getColor(R.color.bottom_bg)
-
-        // 设置主背景
-        binding.main.setBackgroundColor(bgColor)
-        
-        // 设置所有 Fragment 容器的背景
-        findViewById<View>(R.id.container_left)?.setBackgroundColor(bgColor)
-        findViewById<View>(R.id.container_middle)?.setBackgroundColor(bgColor)
-        findViewById<View>(R.id.container_right)?.setBackgroundColor(bgColor)
-        findViewById<View>(R.id.container_bottom)?.setBackgroundColor(bottomBgColor)
-
-        // 保存当前颜色模式到全局，供 Fragment 读取
-        getSharedPreferences(SettingsDialog.PREFS_NAME, MODE_PRIVATE).edit()
-            .putBoolean(SettingsDialog.KEY_NIGHT_MODE, isNightMode)
-            .putInt("textColor", textColor)
-            .apply()
-
-        Log.d(TAG, "背景已设置: bg=${Integer.toHexString(bgColor)}, text=${Integer.toHexString(textColor)}")
     }
 
     override fun onResume() {
@@ -162,31 +224,58 @@ class MainActivity : AppCompatActivity(),
         keyEventManager.stop()
     }
 
+    // SettingsDialog.OnDebugModeChangeListener 回调
+    override fun onDebugModeChanged(enabled: Boolean) {
+        Log.d(TAG, "onDebugModeChanged: enabled=$enabled")
+        try {
+            if (enabled) {
+                Log.d(TAG, "调试模式已开启 - 将显示详细日志")
+                // TODO: 在这里实现调试模式的逻辑，例如显示浮窗日志等
+            } else {
+                Log.d(TAG, "调试模式已关闭")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onDebugModeChanged: ${e.message}")
+        }
+    }
+
     // SettingsDialog 回调 + BottomFragment 回调
     override fun onNightModeChanged() {
         Log.d(TAG, "onNightModeChanged")
         
-        // 先设置主题模式
-        val isNightMode = SettingsDialog.isNightModeEnabled(this)
-        if (isNightMode) {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-        } else {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+        try {
+            val isNightMode = SettingsDialog.isNightModeEnabled(this)
+            if (isNightMode) {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+            } else {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+            }
+            
+            // ✅ 只更新背景，不调用 recreate()
+            applyBackground()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onNightModeChanged: ${e.message}")
         }
-        
-        // 重新创建 Activity，让系统自动切换主题颜色
-        recreate()
     }
 
     override fun onBackgroundChanged() {
         Log.d(TAG, "onBackgroundChanged")
-        // 重新创建 Activity 刷新背景
-        recreate()
+        try {
+            // ✅ 只更新背景，不调用 recreate()
+            applyBackground()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onBackgroundChanged: ${e.message}")
+        }
     }
 
     override fun onTestQuickSwitch() {
         Log.d(TAG, "onTestQuickSwitch")
         showQuickSwitch()
+    }
+
+    override fun onKeyTestToggle() {
+        Log.d(TAG, "onKeyTestToggle")
+        keyEventManager.toggleKeyTest()
     }
 
     private fun handleMediaKey(keyCode: Int): Boolean {
@@ -232,14 +321,6 @@ class MainActivity : AppCompatActivity(),
             KeyEvent.KEYCODE_BUTTON_A -> {
                 if (quickSwitchDialog?.isShowing == true) {
                     quickSwitchDialog?.confirmLaunch()
-                    true
-                } else {
-                    false
-                }
-            }
-            KeyEvent.KEYCODE_BACK -> {
-                if (quickSwitchDialog?.isShowing == true) {
-                    quickSwitchDialog?.dismiss()
                     true
                 } else {
                     false
