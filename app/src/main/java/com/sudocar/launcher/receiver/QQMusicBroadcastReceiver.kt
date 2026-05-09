@@ -6,7 +6,7 @@ import android.content.Intent
 import android.util.Log
 
 /**
- * 监听 QQ 音乐车机版广播，获取歌曲信息和播放状态
+ * 监听 QQ 音乐车机版广播，获取歌曲信息和歌词
  */
 class QQMusicBroadcastReceiver : BroadcastReceiver() {
 
@@ -14,11 +14,15 @@ class QQMusicBroadcastReceiver : BroadcastReceiver() {
         val title: String,
         val artist: String,
         val album: String,
-        val isPlaying: Boolean
+        val isPlaying: Boolean,
+        val lyric: String = ""  // 新增歌词字段
     )
 
     /** Fragment 设置此回调以接收歌曲信息更新（已在主线程回调） */
     var onMusicInfoChanged: ((MusicInfo) -> Unit)? = null
+
+    /** Fragment 设置此回调以接收歌词更新 */
+    var onLyricReceived: ((String) -> Unit)? = null
 
     override fun onReceive(context: Context, intent: Intent) {
         Log.d("QQMusicReceiver", "收到广播: action=${intent.action}")
@@ -28,6 +32,7 @@ class QQMusicBroadcastReceiver : BroadcastReceiver() {
         intent.extras?.let { extras ->
             for (key in extras.keySet()) {
                 try {
+                    Log.d("QQMusicReceiver", "  [$key]${extras.keySet()}")
                     Log.d("QQMusicReceiver", "  [$key] = ${extras.get(key)}")
                 } catch (e: Exception) {
                     Log.d("QQMusicReceiver", "  [$key] = (无法读取)")
@@ -61,8 +66,21 @@ class QQMusicBroadcastReceiver : BroadcastReceiver() {
             isPlaying = (state == 2) // PLAYING 状态
         }
 
-        Log.d("QQMusicReceiver", "解析结果: title=$title, artist=$artist, playing=$isPlaying")
+        // 尝试获取歌词（QQ音乐可能通过广播推送歌词）
+        val lyric = intent.getStringExtra("lyric")
+            ?: intent.getStringExtra("lyric_content")
+            ?: intent.getStringExtra("currentLyric")
+            ?: intent.getStringExtra("playingLyric")
+            ?: intent.getStringExtra("lrc")
+            ?: ""
 
-        onMusicInfoChanged?.invoke(MusicInfo(title, artist, album, isPlaying))
+        if (lyric.isNotEmpty()) {
+            Log.i("QQMusicReceiver", "🎉 收到歌词广播，长度=${lyric.length}")
+            onLyricReceived?.invoke(lyric)
+        }
+
+        Log.d("QQMusicReceiver", "解析结果: title=$title, artist=$artist, playing=$isPlaying, hasLyric=${lyric.isNotEmpty()}")
+
+        onMusicInfoChanged?.invoke(MusicInfo(title, artist, album, isPlaying, lyric))
     }
 }

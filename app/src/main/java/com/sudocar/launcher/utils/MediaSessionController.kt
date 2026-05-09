@@ -170,9 +170,10 @@ class MediaSessionController(private val context: Context) {
     /**
      * 播放/暂停
      * 优先使用 MediaSession，失败则使用广播
+     * @return true 如果有活跃的 MediaSession 并成功发送命令，false 如果仅发送了广播（可能无效）
      */
     fun playPause(): Boolean {
-        // 1. 尝试 MediaSession
+        // 1. 尝试 MediaSession（最可靠的方式）
         val ctrl = activeController
         val controls = ctrl?.transportControls
         
@@ -190,17 +191,20 @@ class MediaSessionController(private val context: Context) {
             }
         }
 
-        // 2. 备用：发送广播到当前音乐包
+        // 2. 没有活跃的 MediaSession，发送广播作为备用
+        // 注意：广播方式不一定能被音乐 APP 接收，返回 false 让调用方知道需要尝试其他方式
+        Log.w(TAG, "没有活跃的 MediaSession，尝试发送广播")
         if (currentPackageName.isNotEmpty()) {
-            return sendMediaButtonBroadcast(currentPackageName, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+            sendMediaButtonBroadcast(currentPackageName, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+        } else {
+            sendMediaButtonBroadcast(null, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
         }
-        
-        // 3. 最后备用：发送广播到所有音乐APP
-        return sendMediaButtonBroadcast(null, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+        return false
     }
 
     /**
      * 下一首
+     * @return true 如果有活跃的 MediaSession 并成功发送命令，false 如果仅发送了广播（可能无效）
      */
     fun next(): Boolean {
         val ctrl = activeController
@@ -216,15 +220,19 @@ class MediaSessionController(private val context: Context) {
             }
         }
 
+        // 没有活跃的 MediaSession，发送广播作为备用
+        Log.w(TAG, "没有活跃的 MediaSession，尝试发送广播")
         if (currentPackageName.isNotEmpty()) {
-            return sendMediaButtonBroadcast(currentPackageName, KeyEvent.KEYCODE_MEDIA_NEXT)
+            sendMediaButtonBroadcast(currentPackageName, KeyEvent.KEYCODE_MEDIA_NEXT)
+        } else {
+            sendMediaButtonBroadcast(null, KeyEvent.KEYCODE_MEDIA_NEXT)
         }
-        
-        return sendMediaButtonBroadcast(null, KeyEvent.KEYCODE_MEDIA_NEXT)
+        return false
     }
 
     /**
      * 上一首
+     * @return true 如果有活跃的 MediaSession 并成功发送命令，false 如果仅发送了广播（可能无效）
      */
     fun previous(): Boolean {
         val ctrl = activeController
@@ -240,11 +248,14 @@ class MediaSessionController(private val context: Context) {
             }
         }
 
+        // 没有活跃的 MediaSession，发送广播作为备用
+        Log.w(TAG, "没有活跃的 MediaSession，尝试发送广播")
         if (currentPackageName.isNotEmpty()) {
-            return sendMediaButtonBroadcast(currentPackageName, KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+            sendMediaButtonBroadcast(currentPackageName, KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+        } else {
+            sendMediaButtonBroadcast(null, KeyEvent.KEYCODE_MEDIA_PREVIOUS)
         }
-        
-        return sendMediaButtonBroadcast(null, KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+        return false
     }
 
     fun seekTo(positionMs: Long): Boolean {
@@ -287,6 +298,13 @@ class MediaSessionController(private val context: Context) {
 
     /** 获取当前包名 */
     fun getCurrentPackageName(): String = currentPackageName
+
+    /**
+     * 获取当前播放位置（毫秒）
+     */
+    fun getCurrentPosition(): Long {
+        return activeController?.playbackState?.position ?: 0L
+    }
 
     companion object {
         private const val TAG = "MediaSessionController"

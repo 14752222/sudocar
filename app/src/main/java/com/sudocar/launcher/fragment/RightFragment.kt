@@ -12,16 +12,29 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.sudocar.launcher.adapter.LyricAdapter
 import com.sudocar.launcher.databinding.FragmentRightBinding
 import com.sudocar.launcher.receiver.QQMusicBroadcastReceiver
 import com.sudocar.launcher.service.MediaNotificationListenerService
 import com.sudocar.launcher.utils.LyricController
+import com.sudocar.launcher.utils.LyricLine
+import com.sudocar.launcher.utils.LyricParser
 import com.sudocar.launcher.utils.MediaSessionController
 import com.sudocar.launcher.utils.QQMusicController
 import com.sudocar.launcher.utils.QQMusicLyricController
 
+/**
+ * 右侧音乐控制面板 Fragment
+ *
+ * 功能：
+ * 1. 通过 MediaSession 获取歌曲信息（支持所有音乐 APP）
+ * 2. 通过 QQ 音乐 AIDL 获取歌词（仅 QQ 音乐车机版）
+ * 3. 通过网络 API 获取歌词（备用方案）
+ * 4. 播放控制（上一首/播放暂停/下一首）
+ * 5. 歌词逐行滚动显示
+ */
 class RightFragment : Fragment() {
 
     private var _binding: FragmentRightBinding? = null
@@ -29,23 +42,48 @@ class RightFragment : Fragment() {
 
     private val musicReceiver by lazy { QQMusicBroadcastReceiver() }
     private val qqLyricController by lazy { QQMusicLyricController(requireContext()) }
-    private val lyricController by lazy { LyricController() }  // 通用歌词控制器
+    private val lyricController by lazy { LyricController() }
     private val mediaSessionController by lazy { MediaSessionController(requireContext()) }
 
-    // 当前歌曲信息，用于歌词请求
+    // 歌词适配器
+    private lateinit var lyricAdapter: LyricAdapter
+
+    // 当前歌曲信息
     private var currentSongTitle = ""
     private var currentArtist = ""
-
     private var isPlaying = false
+    private var hasLyricFromQQMusic = false
 
+    // 歌词数据
+    private var lyricLines = listOf<LyricLine>()
+
+    // 歌词刷新
     private val lyricHandler = Handler(Looper.getMainLooper())
-    private val lyricRunnable = object : Runnable {
+    private val lyricUpdateRunnable = object : Runnable {
         override fun run() {
-            // 仅在播放时轮询歌词，减少 CPU 消耗
-            if (isPlaying) {
-                // 优先尝试 QQ 音乐歌词，失败则使用网络歌词
-                if (mediaSessionController.getCurrentPackageName().contains("qqmusic")) {
-                    qqLyricController.requestLyricManual()
+            if (isPlaying && lyricLines.isNotEmpty()) {
+                updateCurrentLyricLine()
+            }
+            lyricHandler.postDelayed(this, 500) // 500ms 更新一次
+        }
+    }
+
+    // 歌词获取轮询
+    private val lyricFetchRunnable = object : Runnable {
+        override fun run() {
+            if (isPlaying && currentSongTitle.isNotEmpty() && currentSongTitle != "未知歌曲") {
+                val isQQMusicCar = mediaSessionController.getCurrentPackageName() == PKG_QQMUSICCAR
+
+                if (isQQMusicCar) {
+                    if (!hasLyricFromQQMusic) {
+                        qqLyricController.requestLyricManual()
+                        lyricHandler.postDelayed({
+                            if (!hasLyricFromQQMusic) {
+                                Log.d(TAG, "AIDL 未获取到歌词，尝试网络 API")
+                                lyricController.requestLyric(currentSongTitle, currentArtist)
+                            }
+                        }, 1000)
+                    }
                 } else {
                     lyricController.requestLyric(currentSongTitle, currentArtist)
                 }
@@ -65,45 +103,69 @@ class RightFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        initLyricRecyclerView()
         initControllers()
         setupControlButtons()
-        lyricHandler.post(lyricRunnable)
+        startLyricUpdate()
+    }
+
+    private fun initLyricRecyclerView() {
+        lyricAdapter = LyricAdapter()
+
+        // 获取颜色
+        val normalColor = requireContext().getColor(com.sudocar.launcher.R.color.music_text_secondary)
+        val highlightColor = requireContext().getColor(com.sudocar.launcher.R.color.music_accent)
+        lyricAdapter.setColors(normalColor, highlightColor)
+
+        binding.rvLyric.layoutManager = LinearLayoutManager(requireContext())
+        binding.rvLyric.adapter = lyricAdapter
     }
 
     private fun initControllers() {
-        // QQ 音乐歌词控制器（AIDL 方式，仅对 QQ 音乐有效）
+        // ===== 1. QQ 音乐 AIDL 歌词控制器 =====
         qqLyricController.onLyricReceived = { lyric ->
-            binding.tvLyric.text = lyric
+            if (lyric.isNotEmpty()) {
+                loadLyric(lyric, "QQ音乐")
+                hasLyricFromQQMusic = true
+            }
         }
         qqLyricController.bindService()
 
-        // 通用歌词控制器（网络 API，对所有音乐 APP 有效）
+        // ===== 2. 网络歌词控制器 =====
         lyricController.onLyricReceived = { lyric ->
+            Log.d(TAG, "🎵 网络歌词获取成功，长度=${lyric.length}")
             if (lyric.isNotEmpty()) {
-                binding.tvLyric.text = lyric
+                loadLyric(lyric, "网络")
+            } else {
+                showEmptyLyric("暂无歌词")
             }
         }
         lyricController.onError = { error ->
-            Log.d(TAG, "歌词获取失败: $error")
+            Log.e(TAG, "❌ 网络歌词获取失败: $error")
+            showEmptyLyric("歌词获取失败")
         }
 
-        // ---- MediaSession 控制器 (优先) ----
+        // ===== 3. MediaSession 控制器 =====
+        setupMediaSessionController()
+
+        // ===== 4. 广播接收器 =====
+        setupBroadcastReceiver()
+
+        // 初始显示
+        binding.tvSongTitle.text = "未播放"
+        binding.tvArtist.text = "--"
+        showEmptyLyric("等待播放...")
+    }
+
+    private fun setupMediaSessionController() {
         val listenerComponent = ComponentName(
             requireContext(),
             MediaNotificationListenerService::class.java
         )
 
-        // 检查通知访问权限
-        val enabledListeners = Settings.Secure.getString(
-            requireContext().contentResolver,
-            "enabled_notification_listeners"
-        )
-        val hasPermission = enabledListeners?.contains(requireContext().packageName) == true
-
+        val hasPermission = checkNotificationPermission()
         if (!hasPermission) {
-            Log.w(TAG, "未开启通知访问权限，MediaSession 将不可用")
-            // 可选：提示用户开启权限
-            // Toast.makeText(context, "建议开启通知访问以获取媒体信息", Toast.LENGTH_LONG).show()
+            Log.w(TAG, "⚠️ 未开启通知访问权限，MediaSession 将不可用")
         }
 
         mediaSessionController.onMediaInfoChanged = { info ->
@@ -112,107 +174,188 @@ class RightFragment : Fragment() {
             isPlaying = info.isPlaying
             updatePlayPauseIcon()
 
-            // 更新当前歌曲信息，用于歌词请求
             val songChanged = currentSongTitle != info.title || currentArtist != info.artist
-            currentSongTitle = info.title
-            currentArtist = info.artist
-
-            // 歌曲变化时请求歌词
             if (songChanged && info.title != "未知歌曲") {
-                Log.d(TAG, "歌曲变化，请求歌词: ${info.title} - ${info.artist}")
-                // 立即请求歌词
-                if (!info.packageName.contains("qqmusic")) {
+                Log.d(TAG, "🎵 歌曲变化: ${info.title} - ${info.artist}")
+                currentSongTitle = info.title
+                currentArtist = info.artist
+
+                // 重置状态
+                hasLyricFromQQMusic = false
+                lyricLines = emptyList()
+                showEmptyLyric("正在获取歌词...")
+
+                // 请求歌词
+                if (info.packageName != PKG_QQMUSICCAR) {
                     lyricController.requestLyric(info.title, info.artist)
+                } else {
+                    qqLyricController.requestLyricManual()
+                    lyricHandler.postDelayed({
+                        if (!hasLyricFromQQMusic) {
+                            lyricController.requestLyric(currentSongTitle, currentArtist)
+                        }
+                    }, 2000)
                 }
             }
-            
-            // 显示播放来源（调试用）
-            Log.d(TAG, "MediaSession 歌曲: ${info.title} - ${info.artist}, source=${info.packageName}, playing=$isPlaying")
         }
 
-        // 注册 MediaSession 监听
         try {
             mediaSessionController.register(listenerComponent)
-            Log.d(TAG, "MediaSession 注册成功")
+            Log.i(TAG, "✅ MediaSession 注册成功")
         } catch (e: SecurityException) {
-            Log.e(TAG, "MediaSession 注册失败 (权限未授权): ${e.message}")
+            Log.e(TAG, "❌ MediaSession 注册失败: ${e.message}")
+        }
+    }
+
+    private fun setupBroadcastReceiver() {
+        musicReceiver.onLyricReceived = { lyric ->
+            if (lyric.isNotEmpty()) {
+                loadLyric(lyric, "QQ音乐广播")
+                hasLyricFromQQMusic = true
+            }
         }
 
-        // ---- 广播接收器 (备用) ----
         musicReceiver.onMusicInfoChanged = { info ->
-            // 仅当 MediaSession 没有数据时使用广播
-            if (binding.tvSongTitle.text == "未播放") {
+            if (info.lyric.isNotEmpty()) {
+                loadLyric(info.lyric, "QQ音乐广播")
+                hasLyricFromQQMusic = true
+            }
+
+            if (binding.tvSongTitle.text == "未播放" || binding.tvSongTitle.text == "未知歌曲") {
                 binding.tvSongTitle.text = info.title
                 binding.tvArtist.text = info.artist
                 isPlaying = info.isPlaying
                 updatePlayPauseIcon()
-                Log.d(TAG, "Broadcast 歌曲: ${info.title} - ${info.artist}, playing=$isPlaying")
+
+                if (currentSongTitle != info.title) {
+                    currentSongTitle = info.title
+                    currentArtist = info.artist
+                    hasLyricFromQQMusic = false
+                    showEmptyLyric("正在获取歌词...")
+                    lyricController.requestLyric(info.title, info.artist)
+                }
             }
         }
 
         val filter = IntentFilter().apply {
-            // QQ 音乐车机版广播
+            addAction("com.tencent.qqmusiccar.action")
             addAction("com.tencent.qqmusiccar.action.META_CHANGED")
             addAction("com.tencent.qqmusiccar.action.PLAYSTATE_CHANGED")
-            addAction("com.tencent.qqmusiccar.action.MUSIC_INFO_CHANGED")
             addAction("com.tencent.qqmusiccar.playstate_changed")
             addAction("com.tencent.qqmusiccar.metadata_changed")
-            // QQ 音乐手机版广播
+            addAction("com.tencent.qqmusiccar.action.LYRIC_CHANGED")
+            addAction("com.tencent.qqmusiccar.lyric_changed")
             addAction("com.tencent.qqmusic.playstate_changed")
             addAction("com.tencent.qqmusic.metadata_changed")
-            // 通用媒体广播
-            addAction("android.media.metadata")
-            addAction("android.media.playstate")
             addAction("com.android.music.playstatechanged")
-            addAction("com.android.music.playbackcomplete")
             addAction("com.android.music.metachanged")
-            addAction("com.android.music.queuechanged")
         }
-        
-        // 动态注册广播接收器
+
         try {
             requireContext().registerReceiver(musicReceiver, filter, Context.RECEIVER_EXPORTED)
-            Log.d(TAG, "广播接收器注册成功")
+            Log.i(TAG, "✅ 广播接收器注册成功")
         } catch (e: Exception) {
-            Log.e(TAG, "广播接收器注册失败: ${e.message}")
+            Log.e(TAG, "❌ 广播接收器注册失败: ${e.message}")
         }
-        
-        // 初始显示默认文本
-        binding.tvSongTitle.text = "未播放"
-        binding.tvArtist.text = "--"
     }
 
     private fun setupControlButtons() {
         val ctx = requireContext()
-        
-        binding.btnPrev.setOnClickListener { 
-            Log.d(TAG, "点击: 上一首")
-            // 优先使用 MediaSession 控制，备用广播
-            if (!tryMediaSession { it.previous() }) {
+
+        binding.btnPrev.setOnClickListener {
+            Log.d(TAG, "⏮️ 点击: 上一首")
+            val success = tryMediaSession { it.previous() }
+            if (!success) {
                 QQMusicController.prev(ctx)
             }
         }
-        
-        binding.btnPlayPause.setOnClickListener { 
-            Log.d(TAG, "点击: 播放/暂停")
-            // 优先使用 MediaSession 控制，备用广播
-            if (!tryMediaSession { it.playPause() }) {
+
+        binding.btnPlayPause.setOnClickListener {
+            Log.d(TAG, "⏯️ 点击: 播放/暂停")
+            val success = tryMediaSession { it.playPause() }
+            if (!success) {
                 QQMusicController.playPause(ctx)
-                isPlaying = !isPlaying
-                updatePlayPauseIcon()
             }
+            isPlaying = !isPlaying
+            updatePlayPauseIcon()
         }
-        
-        binding.btnNext.setOnClickListener { 
-            Log.d(TAG, "点击: 下一首")
-            // 优先使用 MediaSession 控制，备用广播
-            if (!tryMediaSession { it.next() }) {
+
+        binding.btnNext.setOnClickListener {
+            Log.d(TAG, "⏭️ 点击: 下一首")
+            val success = tryMediaSession { it.next() }
+            if (!success) {
                 QQMusicController.next(ctx)
             }
         }
     }
 
-    /** 尝试使用 MediaSessionController 执行操作，返回是否成功 */
+    private fun startLyricUpdate() {
+        lyricHandler.post(lyricUpdateRunnable)
+        lyricHandler.post(lyricFetchRunnable)
+    }
+
+    /**
+     * 加载歌词并显示
+     */
+    private fun loadLyric(lyric: String, source: String) {
+        // 解析歌词
+        lyricLines = LyricParser.parse(lyric)
+
+        if (lyricLines.isEmpty()) {
+            showEmptyLyric("暂无歌词")
+            return
+        }
+
+        // 更新适配器数据
+        lyricAdapter.setData(lyricLines)
+
+        // 添加空行作为头部和尾部，使第一行和最后一行可以滚动到中间
+        // 这里通过 padding 实现，不需要修改数据
+
+        Log.d(TAG, "📝 歌词加载成功 ($source): 共 ${lyricLines.size} 行")
+    }
+
+    /**
+     * 显示空歌词状态
+     */
+    private fun showEmptyLyric(message: String) {
+        lyricLines = emptyList()
+        lyricAdapter.setData(listOf(LyricLine(0, message)))
+    }
+
+    /**
+     * 更新当前歌词行（根据播放进度）
+     */
+    private fun updateCurrentLyricLine() {
+        if (lyricLines.isEmpty()) return
+
+        // 获取当前播放位置
+        val position = mediaSessionController.getCurrentPosition()
+
+        // 找到当前应该高亮的行
+        val currentIndex = LyricParser.getCurrentLineIndex(lyricLines, position)
+
+        if (currentIndex >= 0 && currentIndex != lyricAdapter.getCurrentLineIndex()) {
+            lyricAdapter.setCurrentLine(currentIndex)
+
+            // 滚动到当前行
+            val layoutManager = binding.rvLyric.layoutManager as LinearLayoutManager
+            val recyclerViewHeight = binding.rvLyric.height
+            val itemHeight = recyclerViewHeight / 5 // 假设显示5行
+            val offset = recyclerViewHeight / 2 - itemHeight / 2
+
+            layoutManager.scrollToPositionWithOffset(currentIndex, offset)
+        }
+    }
+
+    private fun checkNotificationPermission(): Boolean {
+        val enabledListeners = Settings.Secure.getString(
+            requireContext().contentResolver,
+            "enabled_notification_listeners"
+        )
+        return enabledListeners?.contains(requireContext().packageName) == true
+    }
+
     private fun tryMediaSession(action: (MediaSessionController) -> Boolean): Boolean {
         return try {
             action(mediaSessionController)
@@ -222,26 +365,22 @@ class RightFragment : Fragment() {
         }
     }
 
-    // 供外部调用刷新主题
     fun refreshTheme() {
-        // 刷新主题颜色（字体颜色等）
         try {
-            val isNightMode = com.sudocar.launcher.dialog.SettingsDialog.isNightModeEnabled(requireContext())
-            val textColor = requireContext().getColor(com.sudocar.launcher.R.color.music_text_primary)
-            val secondaryColor = requireContext().getColor(com.sudocar.launcher.R.color.music_text_secondary)
-            
-            binding.tvSongTitle.setTextColor(textColor)
-            binding.tvArtist.setTextColor(secondaryColor)
-            binding.tvLyric.setTextColor(secondaryColor)
-            
-            Log.d("RightFragment", "主题刷新: nightMode=$isNightMode")
+            val normalColor = requireContext().getColor(com.sudocar.launcher.R.color.music_text_secondary)
+            val highlightColor = requireContext().getColor(com.sudocar.launcher.R.color.music_accent)
+            lyricAdapter.setColors(normalColor, highlightColor)
+            lyricAdapter.notifyDataSetChanged()
         } catch (e: Exception) {
-            Log.e("RightFragment", "主题刷新失败: ${e.message}")
+            Log.e(TAG, "主题刷新失败: ${e.message}")
         }
     }
 
     private fun updatePlayPauseIcon() {
-        val icon = if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+        val icon = if (isPlaying)
+            android.R.drawable.ic_media_pause
+        else
+            android.R.drawable.ic_media_play
         binding.btnPlayPause.setImageResource(icon)
     }
 
@@ -250,35 +389,21 @@ class RightFragment : Fragment() {
         val ctx = requireContext()
         return when (keyCode) {
             KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
-                if (!tryMediaSession { it.previous() }) {
-                    QQMusicController.prev(ctx)
-                }
-                Log.d(TAG, "方向盘: 上一首")
+                val success = tryMediaSession { it.previous() }
+                if (!success) QQMusicController.prev(ctx)
                 true
             }
             KeyEvent.KEYCODE_MEDIA_NEXT -> {
-                if (!tryMediaSession { it.next() }) {
-                    QQMusicController.next(ctx)
-                }
-                Log.d(TAG, "方向盘: 下一首")
+                val success = tryMediaSession { it.next() }
+                if (!success) QQMusicController.next(ctx)
                 true
             }
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                if (!tryMediaSession { it.playPause() }) {
-                    QQMusicController.playPause(ctx)
-                    isPlaying = !isPlaying
-                    updatePlayPauseIcon()
-                }
-                Log.d(TAG, "方向盘: 播放/暂停")
+                val success = tryMediaSession { it.playPause() }
+                if (!success) QQMusicController.playPause(ctx)
+                isPlaying = !isPlaying
+                updatePlayPauseIcon()
                 true
-            }
-            KeyEvent.KEYCODE_VOLUME_UP -> {
-                // 方向盘音量+（如需自定义处理）
-                false
-            }
-            KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                // 方向盘音量-（如需自定义处理）
-                false
             }
             else -> false
         }
@@ -287,21 +412,18 @@ class RightFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         lyricHandler.removeCallbacksAndMessages(null)
-        // 注销 MediaSession
         mediaSessionController.unregister()
-        // 注销歌词控制器
         qqLyricController.unbindService()
         lyricController.destroy()
-        // 注销广播接收器
-        try { 
-            requireContext().unregisterReceiver(musicReceiver) 
+        try {
+            requireContext().unregisterReceiver(musicReceiver)
         } catch (_: Exception) {}
-        lyricController.unbindService()
         _binding = null
     }
 
     companion object {
         private const val TAG = "RightFragment"
-        private const val LYRIC_REFRESH_INTERVAL = 3000L  // 改成 3 秒，减少 CPU
+        private const val LYRIC_REFRESH_INTERVAL = 5000L
+        const val PKG_QQMUSICCAR = "com.tencent.qqmusiccar"
     }
 }

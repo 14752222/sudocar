@@ -72,27 +72,16 @@
     </LinearLayout>
 
     <!-- 歌词区域 -->
-    <ScrollView
-        android:id="@+id/sv_lyric"
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_lyric"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:layout_marginTop="8dp"
         android:background="@drawable/bg_music_card"
         android:scrollbars="none"
-        android:fadeScrollbars="true">
-
-        <TextView
-            android:id="@+id/tv_lyric"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:lineSpacingMultiplier="2.0"
-            android:textSize="12sp"
-            android:textColor="@color/music_text_secondary"
-            android:padding="12dp"
-            android:text="暂无歌词" />
-    </ScrollView>
+        android:overScrollMode="never"
+        android:padding="12dp" />
 
     <!-- 播放控制区 -->
     <LinearLayout
